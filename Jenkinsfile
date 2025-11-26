@@ -3,9 +3,12 @@ pipeline {
 
     environment {
         MVN = "/opt/homebrew/bin/mvn"
-        DOCKER = "/usr/local/bin/docker"   // ← THIS IS YOUR REAL DOCKER PATH
+        DOCKER = "/usr/local/bin/docker"
         DOCKER_IMAGE = "mattjoe/calculator"
         DOCKER_TAG = "latest"
+
+        // Disable Docker credential helper for Jenkins
+        DOCKER_CONFIG = "/tmp/docker-config"
     }
 
     stages {
@@ -19,7 +22,6 @@ pipeline {
         stage('Build') {
             steps {
                 sh '''
-                    echo "=== COMPILING JAVA PROJECT ==="
                     $MVN clean compile
                 '''
             }
@@ -28,7 +30,6 @@ pipeline {
         stage('Test') {
             steps {
                 sh '''
-                    echo "=== RUNNING TESTS ==="
                     $MVN test
                 '''
             }
@@ -42,7 +43,6 @@ pipeline {
         stage('Package') {
             steps {
                 sh '''
-                    echo "=== PACKAGING JAR ==="
                     $MVN package -DskipTests
                 '''
             }
@@ -51,8 +51,11 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 sh '''
+                    echo "=== SETTING UP DOCKER CONFIG ==="
+                    mkdir -p $DOCKER_CONFIG
+                    echo '{"credsStore": ""}' > $DOCKER_CONFIG/config.json
+
                     echo "=== BUILDING DOCKER IMAGE ==="
-                    $DOCKER --version
                     $DOCKER build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
                 '''
             }
@@ -64,25 +67,19 @@ pipeline {
                                                  usernameVariable: 'DOCKER_USER',
                                                  passwordVariable: 'DOCKER_PASS')]) {
                     sh '''
-                        echo "=== LOGGING IN TO DOCKER HUB ==="
+                        echo "=== DOCKER LOGIN ==="
+                        mkdir -p $DOCKER_CONFIG
+                        echo '{"credsStore": ""}' > $DOCKER_CONFIG/config.json
+
                         echo "${DOCKER_PASS}" | $DOCKER login -u "${DOCKER_USER}" --password-stdin
 
                         echo "=== PUSHING IMAGE ==="
                         $DOCKER push ${DOCKER_IMAGE}:${DOCKER_TAG}
 
-                        $DOCKER logout
+                        $DOCKER logout || true
                     '''
                 }
             }
-        }
-    }
-
-    post {
-        success {
-            echo "Pipeline completed successfully!"
-        }
-        failure {
-            echo "Pipeline failed — check logs."
         }
     }
 }
