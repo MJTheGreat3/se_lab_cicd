@@ -1,152 +1,89 @@
 pipeline {
     agent any
-    
+
     environment {
-        DOCKER_IMAGE = 'mattjoe/calculator'
-        DOCKER_TAG = 'latest'
+        DOCKER_IMAGE = "mattjoe/calculator"
+        DOCKER_TAG = "latest"
+        MAVEN_HOME = "/usr/local/bin/mvn"
     }
-    
+
     stages {
+
         stage('Checkout') {
             steps {
-                // Pull code from GitHub repository
                 git branch: 'main', url: 'https://github.com/MJTheGreat3/se_lab_cicd.git'
-                echo 'Successfully checked out code from repository'
+                echo "Source code checked out"
             }
         }
-        
+
         stage('Build') {
             steps {
-                script {
-                    // Install Maven manually
-                    sh '''
-                        echo "=== BUILD STAGE STARTING ==="
-                        if ! command -v mvn &> /dev/null; then
-                            echo "Installing Maven manually..."
-                            curl -O https://archive.apache.org/dist/maven/maven-3/3.9.4/binaries/apache-maven-3.9.4-bin.tar.gz
-                            tar -xzf apache-maven-3.9.4-bin.tar.gz
-                            export PATH=$PWD/apache-maven-3.9.4/bin:$PATH
-                            echo "Maven installed at: $PWD/apache-maven-3.9.4/bin/mvn"
-                        else
-                            echo "Maven already available"
-                        fi
-                        echo "Running Maven compile..."
-                        $PWD/apache-maven-3.9.4/bin/mvn clean compile
-                    '''
-                    echo 'Application compiled successfully'
-                }
+                sh '''
+                    echo "=== COMPILING JAVA PROJECT ==="
+                    mvn -version
+                    mvn clean compile
+                '''
             }
         }
-        
+
         stage('Test') {
             steps {
-                script {
-                    sh '''
-                        echo "Running Maven tests..."
-                        $PWD/apache-maven-3.9.4/bin/mvn test
-                    '''
-                    echo 'Tests completed successfully'
-                }
+                sh '''
+                    echo "=== RUNNING TESTS ==="
+                    mvn test
+                '''
             }
             post {
                 always {
-                    // Archive test results
                     junit 'target/surefire-reports/*.xml'
                 }
-                success {
-                    echo 'All tests passed!'
-                }
-                failure {
-                    echo 'Tests failed! Pipeline will stop.'
-                }
             }
         }
-        
+
         stage('Package') {
             steps {
-                script {
-                    sh '''
-                        echo "Packaging Java application..."
-                        $PWD/apache-maven-3.9.4/bin/mvn package -DskipTests
-                    '''
-                    echo 'Application packaged successfully'
-                }
+                sh '''
+                    echo "=== PACKAGING JAR ==="
+                    mvn package -DskipTests
+                '''
             }
         }
-        
+
         stage('Build Docker Image') {
             steps {
-                script {
-                    echo 'Building Docker image...'
-                    sh '''
-                        if command -v docker &> /dev/null; then
-                            export DOCKER_CONFIG=/tmp
-                            echo '{"credsStore": ""}' > /tmp/config.json
-                            docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
-                        else
-                            echo "Docker not available, skipping Docker image build"
-                        fi
-                    '''
-                    echo 'Docker image build completed'
-                }
+                sh '''
+                    echo "=== BUILDING DOCKER IMAGE ==="
+                    docker --version
+                    docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
+                '''
             }
         }
-        
+
         stage('Push to DockerHub') {
             steps {
-                script {
-                    echo 'Pushing Docker image to DockerHub...'
-                    
-                    // Login to DockerHub (credentials should be configured in Jenkins)
-                    script {
-                        if (sh(script: 'command -v docker &> /dev/null', returnStatus: true) == 0) {
-                            withCredentials([usernamePassword(credentialsId: 'dockerhub-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                                sh '''
-                                    export DOCKER_CONFIG=/tmp
-                                    export HTTP_PROXY=""
-                                    export HTTPS_PROXY=""
-                                    export NO_PROXY="registry-1.docker.io,docker.io"
-                                    echo '{"credsStore": ""}' > /tmp/config.json
-                                    echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin
-                                '''
-                            }
-                            
-                            // Push the image
-                            sh '''
-                                export DOCKER_CONFIG=/tmp
-                                export HTTP_PROXY=""
-                                export HTTPS_PROXY=""
-                                export NO_PROXY="registry-1.docker.io,docker.io"
-                                docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
-                            '''
-                        } else {
-                            echo "Docker not available, skipping Docker push"
-                        }
-                    }
-                    echo 'Docker image pushed successfully to DockerHub'
-                    
-                    // Logout from DockerHub
-                    script {
-                        if (sh(script: 'command -v docker &> /dev/null', returnStatus: true) == 0) {
-                            sh 'DOCKER_CONFIG=/tmp docker logout'
-                        }
-                    }
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-cred',
+                                                 usernameVariable: 'DOCKER_USER',
+                                                 passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                        echo "=== LOGGING IN TO DOCKER HUB ==="
+                        echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
+
+                        echo "=== PUSHING IMAGE ==="
+                        docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
+
+                        docker logout
+                    '''
                 }
             }
         }
     }
-    
+
     post {
-        always {
-            // Clean up workspace
-            cleanWs()
-        }
         success {
-            echo 'Pipeline completed successfully!'
-            echo "Docker image ${DOCKER_IMAGE}:${DOCKER_TAG} is available on DockerHub"
+            echo "Pipeline completed successfully!"
         }
         failure {
-            echo 'Pipeline failed! Please check the logs above.'
+            echo "Pipeline failed — check above logs."
         }
     }
 }
