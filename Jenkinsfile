@@ -100,7 +100,7 @@ pipeline {
                     // Login to DockerHub (credentials should be configured in Jenkins)
                     script {
                         if (sh(script: 'command -v docker &> /dev/null', returnStatus: true) == 0) {
-                            withCredentials([usernamePassword(credentialsId: '800836f4-9491-406c-b224-c9a1f03d91de', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                            withCredentials([usernamePassword(credentialsId: 'dockerhub-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                                 sh '''
                                     export DOCKER_CONFIG=/tmp
                                     export HTTP_PROXY=""
