@@ -4,7 +4,7 @@ pipeline {
     environment {
         DOCKER_IMAGE = "mattjoe/calculator"
         DOCKER_TAG = "latest"
-        MAVEN_HOME = "/usr/local/bin/mvn"
+        MAVEN_HOME = "/opt/homebrew/bin/mvn"
     }
 
     stages {
