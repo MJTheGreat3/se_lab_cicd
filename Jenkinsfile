@@ -4,13 +4,13 @@ pipeline {
     environment {
         DOCKER_IMAGE = 'mattjoe/calculator'
         DOCKER_TAG = 'latest'
-        DOCKER = '/usr/local/bin/docker'   // <<── ADDED THIS
     }
     
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/MJTheGreat3/se_lab_cicd.git'
+                // Pull code from GitHub repository
+                git branch: 'main', url: 'https://github.com/MJTheGreat3/se_lab_cicd'
                 echo 'Successfully checked out code from repository'
             }
         }
@@ -18,6 +18,7 @@ pipeline {
         stage('Build') {
             steps {
                 script {
+                    // Install Maven manually
                     sh '''
                         echo "=== BUILD STAGE STARTING ==="
                         if ! command -v mvn &> /dev/null; then
@@ -49,6 +50,7 @@ pipeline {
             }
             post {
                 always {
+                    // Archive test results
                     junit 'target/surefire-reports/*.xml'
                 }
                 success {
@@ -77,10 +79,10 @@ pipeline {
                 script {
                     echo 'Building Docker image...'
                     sh '''
-                        if command -v ${DOCKER} &> /dev/null; then
+                        if command -v /usr/local/bin/docker &> /dev/null; then
                             export DOCKER_CONFIG=/tmp
                             echo '{"credsStore": ""}' > /tmp/config.json
-                            ${DOCKER} build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
+                            /usr/local/bin/docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
                         else
                             echo "Docker not available, skipping Docker image build"
                         fi
@@ -95,8 +97,9 @@ pipeline {
                 script {
                     echo 'Pushing Docker image to DockerHub...'
                     
+                    // Login to DockerHub (credentials should be configured in Jenkins)
                     script {
-                        if (sh(script: "command -v ${DOCKER} &> /dev/null", returnStatus: true) == 0) {
+                        if (sh(script: 'command -v /usr/local/bin/docker &> /dev/null', returnStatus: true) == 0) {
                             withCredentials([usernamePassword(credentialsId: 'dockerhub-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                                 sh '''
                                     export DOCKER_CONFIG=/tmp
@@ -104,25 +107,28 @@ pipeline {
                                     export HTTPS_PROXY=""
                                     export NO_PROXY="registry-1.docker.io,docker.io"
                                     echo '{"credsStore": ""}' > /tmp/config.json
-                                    echo ${DOCKER_PASS} | ${DOCKER} login -u ${DOCKER_USER} --password-stdin
+                                    echo ${DOCKER_PASS} | /usr/local/bin/docker login -u ${DOCKER_USER} --password-stdin
                                 '''
                             }
                             
+                            // Push the image
                             sh '''
                                 export DOCKER_CONFIG=/tmp
                                 export HTTP_PROXY=""
                                 export HTTPS_PROXY=""
                                 export NO_PROXY="registry-1.docker.io,docker.io"
-                                ${DOCKER} push ${DOCKER_IMAGE}:${DOCKER_TAG}
+                                /usr/local/bin/docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
                             '''
                         } else {
                             echo "Docker not available, skipping Docker push"
                         }
                     }
+                    echo 'Docker image pushed successfully to DockerHub'
                     
+                    // Logout from DockerHub
                     script {
-                        if (sh(script: "command -v ${DOCKER} &> /dev/null", returnStatus: true) == 0) {
-                            sh 'DOCKER_CONFIG=/tmp ${DOCKER} logout'
+                        if (sh(script: 'command -v /usr/local/bin/docker &> /dev/null', returnStatus: true) == 0) {
+                            sh 'DOCKER_CONFIG=/tmp /usr/local/bin/docker logout'
                         }
                     }
                 }
@@ -132,6 +138,7 @@ pipeline {
     
     post {
         always {
+            // Clean up workspace
             cleanWs()
         }
         success {
