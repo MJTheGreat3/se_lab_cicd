@@ -4,7 +4,7 @@ pipeline {
     environment {
         DOCKER_IMAGE = "mattjoe/calculator"
         DOCKER_TAG = "latest"
-        MAVEN_HOME = "/opt/homebrew/bin/mvn"
+        MVN = "/opt/homebrew/bin/mvn"
     }
 
     stages {
@@ -20,8 +20,8 @@ pipeline {
             steps {
                 sh '''
                     echo "=== COMPILING JAVA PROJECT ==="
-                    mvn -version
-                    mvn clean compile
+                    $MVN -version
+                    $MVN clean compile
                 '''
             }
         }
@@ -30,7 +30,7 @@ pipeline {
             steps {
                 sh '''
                     echo "=== RUNNING TESTS ==="
-                    mvn test
+                    $MVN test
                 '''
             }
             post {
@@ -44,7 +44,7 @@ pipeline {
             steps {
                 sh '''
                     echo "=== PACKAGING JAR ==="
-                    mvn package -DskipTests
+                    $MVN package -DskipTests
                 '''
             }
         }
