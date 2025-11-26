@@ -2,9 +2,10 @@ pipeline {
     agent any
 
     environment {
+        MVN = "/opt/homebrew/bin/mvn"
+        DOCKER = "/usr/local/bin/docker"   // ← THIS IS YOUR REAL DOCKER PATH
         DOCKER_IMAGE = "mattjoe/calculator"
         DOCKER_TAG = "latest"
-        MVN = "/opt/homebrew/bin/mvn"
     }
 
     stages {
@@ -12,7 +13,6 @@ pipeline {
         stage('Checkout') {
             steps {
                 git branch: 'main', url: 'https://github.com/MJTheGreat3/se_lab_cicd.git'
-                echo "Source code checked out"
             }
         }
 
@@ -20,7 +20,6 @@ pipeline {
             steps {
                 sh '''
                     echo "=== COMPILING JAVA PROJECT ==="
-                    $MVN -version
                     $MVN clean compile
                 '''
             }
@@ -53,8 +52,8 @@ pipeline {
             steps {
                 sh '''
                     echo "=== BUILDING DOCKER IMAGE ==="
-                    docker --version
-                    docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
+                    $DOCKER --version
+                    $DOCKER build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
                 '''
             }
         }
@@ -66,12 +65,12 @@ pipeline {
                                                  passwordVariable: 'DOCKER_PASS')]) {
                     sh '''
                         echo "=== LOGGING IN TO DOCKER HUB ==="
-                        echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
+                        echo "${DOCKER_PASS}" | $DOCKER login -u "${DOCKER_USER}" --password-stdin
 
                         echo "=== PUSHING IMAGE ==="
-                        docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
+                        $DOCKER push ${DOCKER_IMAGE}:${DOCKER_TAG}
 
-                        docker logout
+                        $DOCKER logout
                     '''
                 }
             }
@@ -83,7 +82,7 @@ pipeline {
             echo "Pipeline completed successfully!"
         }
         failure {
-            echo "Pipeline failed — check above logs."
+            echo "Pipeline failed — check logs."
         }
     }
 }
